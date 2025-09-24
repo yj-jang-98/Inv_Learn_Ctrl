@@ -2,61 +2,61 @@ import numpy as np
 from scipy.optimize import root_scalar
 
 def genA(delta, XI, U, kbar, y_ref, gammaInv):
-    # XI : [y(k+1), y(k), y(k-1) u(k-1)] = [y_i^+, zeta_i]
-    ZETAPLUS = XI[1:, 1:4]  
-    ZETA     = XI[:-1, 1:4] 
+    # --- Zeta shifted forward (zeta_{i+1}) ---
+    ZETAPLUS = XI[1:, 1:]   
+    # --- Zeta shifted forward (zeta_{i}) ---
+    ZETA     = XI[:-1, 1:]
     n = ZETA.shape[0]
-    A = []
 
-    # === Step 1: Initial reachable set A_delta^0 ===
-    I0 = {'i': [], 'ri': []}
+    A = [] 
 
+    # === Step 1: Generate A_delta^0 ===
+    A0 = {'i': [], 'ri': []}
     for idx in range(n):
-        yplus = XI[idx, 0]  
+        yplus = XI[idx, 0]                        
         dist_to_ref = np.linalg.norm(yplus - y_ref)
         if dist_to_ref < delta:
-            I0['i'].append(idx)
-            I0['ri'].append(delta - dist_to_ref)
-    A.append(I0)
+            A0['i'].append(idx)
+            A0['ri'].append(delta - dist_to_ref)  
+    A.append(A0)
 
-    # === Step 2: A_delta^1
-    I1 = {'i': [], 'ri': []}
-    for idxx in range(len(I0['i'])):
-        idx = I0['i'][idxx]
-        ri = gammaInv(I0['ri'][idxx])
-        I1['i'].append(idx)
-        I1['ri'].append(ri)
-    A.append(I1)
+    # === Step 2: Generate A_delta^1 ===
+    A1 = {'i': [], 'ri': []}
+    for idx, r0 in zip(A0['i'], A0['ri']):
+        r1 = gammaInv(r0)   
+        A1['i'].append(idx)
+        A1['ri'].append(r1)
+    A.append(A1)
 
-
-    # === Step 3: k \ge 2
+    # === Step 3: Generate A_delta^j, j >= 2 ===
     for k in range(2, kbar + 1):
-        I = {'i': [], 'ri': []}
-        IPast = A[k - 1]
-        nPast = len(IPast['i'])
-        if nPast == 0:
+        Ak = {'i': [], 'ri': []}
+        A_prev = A[k - 1]
+        if not A_prev['i']:  
             break
+
+        # --- Test reachability for each Zeta ---
         for idx in range(n):
             zeta_next = ZETAPLUS[idx, :]
-            ri = None
+            best_radius = None
 
-            for idxx in range(nPast):  # Loop over previous reachable points
-                idx_past = IPast['i'][idxx]
-                ri_past = IPast['ri'][idxx]
-                zeta_past = ZETA[idx_past, :]
+            for idx_prev, r_prev in zip(A_prev['i'], A_prev['ri']):
+                zeta_prev = ZETA[idx_prev, :]
+                dist = np.linalg.norm(zeta_next - zeta_prev)
 
-                dist = np.linalg.norm(zeta_next - zeta_past)
+                if dist < r_prev:
+                    diff = r_prev - dist
+                    r_candidate = gammaInv(diff)
 
-                if dist < ri_past:
-                    diff = ri_past - dist
-                    ri_candidate = gammaInv(diff)
+                    # --- Keep the largest radius if multiple apply ---
+                    if best_radius is None or r_candidate > best_radius:
+                        best_radius = r_candidate
 
-                    if ri is None or ri_candidate > ri:
-                        ri = ri_candidate
+            # --- If reachable, record candidate ---
+            if best_radius is not None:
+                Ak['i'].append(idx)
+                Ak['ri'].append(best_radius)
 
-            if ri is not None:
-                I['i'].append(idx)
-                I['ri'].append(ri)
-        A.append(I)
+        A.append(Ak)
 
     return A

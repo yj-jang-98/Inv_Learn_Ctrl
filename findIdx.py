@@ -1,27 +1,29 @@
 import numpy as np
 
 def findIdx(curr_state, ZETA, XI, A):
-    matched = False
-    idx_match = None
+    # --- Flag indicating whether a match is found ---
+    matched = False   
+    # --- Index of the matching candidate ---    
+    idx_match = None  
+
+    # --- Loop over all A_\delta^j and find idx
     for a in A[1:]:
-        min_dist = np.inf
+        # --- Track the best match distance
+        min_dist = np.inf  
+
+        # --- Compare distance between curr_state and center with radius
         for idx_candidate, radius in zip(a['i'], a['ri']):
-            center = ZETA[idx_candidate, :]
-            dist = np.linalg.norm(center - curr_state)
+            center = ZETA[idx_candidate, :]        
+            dist = np.linalg.norm(center - curr_state)  
+
+            # --- Check if current state lies inside this ball ---
             if dist <= radius and dist < min_dist:
                 matched = True
-                min_dist = abs(XI[idx_candidate,0])
+                min_dist = abs(XI[idx_candidate, 0])
                 idx_match = idx_candidate
+
+        # --- If a match was found in this set, stop searching
         if matched:
             break
-    return matched, idx_match
 
-def findNear(curr_state, ZETA):
-    min_dist = np.inf
-    for idx_candidate in range(ZETA.shape[0]):
-        center = ZETA[idx_candidate, :]
-        dist = np.linalg.norm(center - curr_state)
-        if dist < min_dist:
-            min_dist = dist
-            nearest_idx = idx_candidate
-    return nearest_idx
+    return matched, idx_match
